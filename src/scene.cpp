@@ -317,13 +317,19 @@ void Test::Step(Settings& settings)
 	m_world->Step(timeStep, settings.m_velocityIterations, settings.m_positionIterations);
 
 
+	glBindTexture(GL_TEXTURE_2D, m_tex);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, g_camera.m_width, g_camera.m_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
 	m_world->DebugDraw();
     g_debugDraw.Flush();
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     ImGui::SetNextWindowPos({0.0f, 0.0f});
-    ImGui::SetNextWindowSize({float(g_camera.m_width-10.f), float(g_camera.m_height-10.f)});
+    ImGui::SetNextWindowSize({float(g_camera.m_width), float(g_camera.m_height)});
 
     ImGui::Begin("Viewport", &g_debugDraw.m_showUI, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
 
