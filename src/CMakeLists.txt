@@ -1,5 +1,5 @@
 # Add executable
-file(GLOB SOURCES *.cpp *.h)
+file(GLOB SOURCES *.cpp *.h tests/*.cpp)
 add_executable(magnet ${SOURCES})
 
 # Set include directories
