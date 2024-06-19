@@ -79,7 +79,7 @@ public:
 
     enum
     {
-        e_count = 50
+        e_count = 2
     };
 
     Magnets()
@@ -173,20 +173,22 @@ public:
 
 			void main()
 			{
-			    vec2 E = vec2(0.0, 0.0);
+			    vec2 B = vec2(0.0, 0.0);
 			    for(int i = 0; i < numPos; ++i)
 			    {
-			        vec2 r = (inversProjectionMatrix * vec4(fragCoord, 0.0, 1.0)).xy - positions[i];
-			        float distance = length(r);
-			        if(distance > 0.01)
-			        {
-			            vec2 E_i = k * 1.0 * r / (distance * distance * distance);
-			            E += E_i;
-			        }
+			        vec2 dir = (inversProjectionMatrix * vec4(fragCoord, 0.0, 1.0)).xy - positions[i];
+			        float distance = length(dir);
+					vec2 NIK = (1.0/distance) * dir;
+					if (distance > 0.01)
+					{
+			        B +=
+			        1.0f / (distance * distance * distance) *
+			        (3.0f * dot(NIK, moments[i]) * NIK - moments[i]);
+					}
 			    }
 
-			    float magnitude = length(E);
-			    vec4 fieldColor = vec4(0.5 + 0.5 * E / magnitude, 1.0 - magnitude / 1e5, 0.1);
+			    float magnitude = length(B);
+			    vec4 fieldColor = vec4((0.5 + 0.5 * B / magnitude).x, 0.0, (0.5 + 0.5 * B / magnitude).y, 0.2);
 			    color = fieldColor;
 			}
 			)";
