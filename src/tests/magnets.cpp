@@ -2,10 +2,77 @@
 // Created by yilong on 2024/6/2.
 //
 
+#include <iostream>
+#include <vector>
+
 #include "scene.h"
 #include "imgui/imgui.h"
 
 // This shows how to use sensor shapes. Sensors don't have collision, but report overlap events.
+static void sPrintLog(GLuint object)
+{
+    GLint log_length = 0;
+    if (glIsShader(object))
+        glGetShaderiv(object, GL_INFO_LOG_LENGTH, &log_length);
+    else if (glIsProgram(object))
+        glGetProgramiv(object, GL_INFO_LOG_LENGTH, &log_length);
+    else
+    {
+        fprintf(stderr, "printlog: Not a shader or a program\n");
+        return;
+    }
+
+    char* log = (char*)malloc(log_length);
+
+    if (glIsShader(object))
+        glGetShaderInfoLog(object, log_length, NULL, log);
+    else if (glIsProgram(object))
+        glGetProgramInfoLog(object, log_length, NULL, log);
+
+    fprintf(stderr, "%s", log);
+    free(log);
+}
+
+
+static GLuint sCreateShaderFromString(const char* source, GLenum type)
+{
+    GLuint res = glCreateShader(type);
+    const char* sources[] = { source };
+    glShaderSource(res, 1, sources, NULL);
+    glCompileShader(res);
+    GLint compile_ok = GL_FALSE;
+    glGetShaderiv(res, GL_COMPILE_STATUS, &compile_ok);
+    if (compile_ok == GL_FALSE)
+    {
+        fprintf(stderr, "Error compiling shader of type %d!\n", type);
+        sPrintLog(res);
+        glDeleteShader(res);
+        return 0;
+    }
+
+    return res;
+}
+static GLuint sCreateShaderProgram(const char* vs, const char* fs)
+{
+    GLuint vsId = sCreateShaderFromString(vs, GL_VERTEX_SHADER);
+    GLuint fsId = sCreateShaderFromString(fs, GL_FRAGMENT_SHADER);
+    assert(vsId != 0 && fsId != 0);
+
+    GLuint programId = glCreateProgram();
+    glAttachShader(programId, vsId);
+    glAttachShader(programId, fsId);
+    glBindFragDataLocation(programId, 0, "color");
+    glLinkProgram(programId);
+
+    glDeleteShader(vsId);
+    glDeleteShader(fsId);
+
+    GLint status = GL_FALSE;
+    glGetProgramiv(programId, GL_LINK_STATUS, &status);
+    assert(status != GL_FALSE);
+
+    return programId;
+}
 class Magnets : public Test
 {
 public:
@@ -60,6 +127,89 @@ public:
         }
 
         m_force = 100.0f;
+
+        //gl stuff
+        glGenFramebuffers(1, &m_fbo);
+        glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
+
+        glGenTextures(1, &m_tex);
+        glBindTexture(GL_TEXTURE_2D, m_tex);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, g_camera.m_width, g_camera.m_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_tex, 0);
+
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+            std::cout << "fuck!";
+            exit(1);
+        }
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        {
+            const char* vertexShaderSource = R"(
+			#version 330 core
+			layout(location = 0) in vec2 position;
+			out vec2 fragCoord;
+			void main()
+			{
+			    fragCoord = position;
+			    gl_Position = vec4(position, 0.0, 1.0);
+			}
+			)";
+
+            const char* fragmentShaderSource = R"(
+			#version 330 core
+			in vec2 fragCoord;
+			out vec4 color;
+			uniform mat4 projectionMatrix;
+			uniform mat4 inversProjectionMatrix;
+			uniform vec2 positions[100];
+			uniform vec2 moments[100];
+			uniform int numPos;
+			const float k = 8.0;
+
+			void main()
+			{
+			    vec2 E = vec2(0.0, 0.0);
+			    for(int i = 0; i < numPos; ++i)
+			    {
+			        vec2 r = (inversProjectionMatrix * vec4(fragCoord, 0.0, 1.0)).xy - positions[i];
+			        float distance = length(r);
+			        if(distance > 0.01)
+			        {
+			            vec2 E_i = k * 1.0 * r / (distance * distance * distance);
+			            E += E_i;
+			        }
+			    }
+
+			    float magnitude = length(E);
+			    vec4 fieldColor = vec4(0.5 + 0.5 * E / magnitude, 1.0 - magnitude / 1e5, 0.1);
+			    color = fieldColor;
+			}
+			)";
+
+            shaderProgram = sCreateShaderProgram(vertexShaderSource, fragmentShaderSource);
+        	glGenVertexArrays(1, &VAO);
+            glGenBuffers(1, &VBO);
+
+            glBindVertexArray(VAO);
+
+            glBindBuffer(GL_ARRAY_BUFFER, VBO);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+            glEnableVertexAttribArray(0);
+        }
+    }
+
+    ~Magnets()
+    {
+        glDeleteVertexArrays(1, &VAO);
+        glDeleteBuffers(1, &VBO);
+        glDeleteProgram(shaderProgram);
     }
 
     // Implement contact listener.
@@ -78,9 +228,13 @@ public:
         ImGui::SetNextWindowSize(ImVec2(200.0f, 60.0f));
         ImGui::Begin("Sensor Controls", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
 
+        //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         ImGui::SliderFloat("mu", &m_nu, 0.1f, 200000.0f, "%.0f");
 
-        for (int i = -40; i < 40; i++)
+        //glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
+        //glBindTexture(GL_TEXTURE_2D, m_tex);
+        //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    	for (int i = -40; i < 40; i++)
         {
             for (int j = 0; j < 40; j++)
             {
@@ -99,7 +253,76 @@ public:
                 g_debugDraw.DrawSegment(PosK, PosK + 1.0f * NormB, b2Color(NormB.x,NormB.y,0,0));
             }
         }
+        positionsFlat.clear();
+        momentFlat.clear();
+        for (int32 ii = 0; ii < e_count; ++ii)
+        {
+            b2Body* body = m_bodies[ii];
+            b2Vec2 PosI = body->GetPosition();
+            b2Vec2 MomentI = b2Mul(body->GetTransform().q, b2Vec2(1.0f, 0.0f));
+            positionsFlat.push_back(PosI.x);
+            positionsFlat.push_back(PosI.y);
+            momentFlat.push_back(MomentI.x);
+            momentFlat.push_back(MomentI.y);
+        }
+        g_debugDraw.Flush();
+        //glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        ImVec2 pos = ImGui::GetCursorScreenPos();
+        const float window_width = ImGui::GetContentRegionAvail().x;
+        const float window_height = ImGui::GetContentRegionAvail().y;
+
+
         ImGui::End();
+
+        //glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
+        //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDisable(GL_DEPTH_TEST);
+        glUseProgram(shaderProgram);
+
+        GLint positionsLoc = glGetUniformLocation(shaderProgram, "positions");
+        GLint momentsLoc = glGetUniformLocation(shaderProgram, "moments");
+        GLint numPosLoc = glGetUniformLocation(shaderProgram, "numPos");
+        GLint projectionLoc = glGetUniformLocation(shaderProgram, "projectionMatrix");
+        GLint invprojectionLoc = glGetUniformLocation(shaderProgram, "inversProjectionMatrix");
+
+        float proj[16] = { 0.0f };
+        float invproj[16] = { 0.0f };
+        g_camera.BuildProjectionMatrix(proj, 0.0f);
+        g_camera.BuildInverseProjectionMatrix(invproj, 0.0f);
+        glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, proj);
+        glUniformMatrix4fv(invprojectionLoc, 1, GL_FALSE, invproj);
+
+
+        glUniform2fv(positionsLoc, e_count, positionsFlat.data());
+        glUniform2fv(momentsLoc, e_count, momentFlat.data());
+
+        glUniform1i(numPosLoc, e_count);
+        glBindVertexArray(VAO);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+        GLenum errCode = glGetError();
+        if (errCode != GL_NO_ERROR)
+        {
+            fprintf(stderr, "OpenGL error = %d\n", errCode);
+            assert(false);
+        }
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindVertexArray(0);
+        glUseProgram(0);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        //ImGui::GetWindowDrawList()->AddImage(
+        //    reinterpret_cast<void*>(m_tex),
+        //    ImVec2(pos.x, pos.y),
+        //    ImVec2(pos.x + window_width, pos.y + window_height),
+        //    ImVec2(0, 1),
+        //    ImVec2(1, 0)
+        //);
     }
 
     void Step(Settings& settings) override
@@ -176,6 +399,17 @@ public:
     b2Body* m_bodies[e_count];
     float m_force;
     float m_nu = 20000;
+
+    std::vector<float> positionsFlat;
+    std::vector<float> momentFlat;
+    float vertices[8] = {
+        -1.0f, -1.0f,
+         1.0f, -1.0f,
+        -1.0f,  1.0f,
+         1.0f,  1.0f
+    };
+    GLuint VAO, VBO;
+    GLuint shaderProgram;
 };
 
 static int testIndex = RegisterTest("Magnets", "Magnets", Magnets::Create);

@@ -125,6 +125,48 @@ void Camera::BuildProjectionMatrix(float* m, float zBias)
 	m[15] = 1.0f;
 }
 
+void Camera::BuildInverseProjectionMatrix(float* m, float zBias)
+{
+	float w = float(m_width);
+	float h = float(m_height);
+	float ratio = w / h;
+	b2Vec2 extents(ratio * 25.0f, 25.0f);
+	extents *= m_zoom;
+
+	b2Vec2 lower = m_center - extents;
+	b2Vec2 upper = m_center + extents;
+
+	// Calculate the scale factors
+	float sx = (upper.x - lower.x) / 2.0f;
+	float sy = (upper.y - lower.y) / 2.0f;
+
+	// Calculate the translation factors
+	float tx = (upper.x + lower.x) / 2.0f;
+	float ty = (upper.y + lower.y) / 2.0f;
+
+	// Inverse of the orthographic projection matrix
+	m[0] = sx;
+	m[1] = 0.0f;
+	m[2] = 0.0f;
+	m[3] = 0.0f;
+
+	m[4] = 0.0f;
+	m[5] = sy;
+	m[6] = 0.0f;
+	m[7] = 0.0f;
+
+	m[8] = 0.0f;
+	m[9] = 0.0f;
+	m[10] = 1.0f;
+	m[11] = 0.0f;
+
+	m[12] = tx;
+	m[13] = ty;
+	m[14] = -zBias;
+	m[15] = 1.0f;
+}
+
+
 //
 static void sCheckGLError()
 {

@@ -46,24 +46,6 @@ Test::Test()
 	memset(&m_totalProfile, 0, sizeof(b2Profile));
 
 
-	glGenFramebuffers(1, &m_fbo);
-	glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
-
-	glGenTextures(1, &m_tex);
-	glBindTexture(GL_TEXTURE_2D, m_tex);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, g_camera.m_width, g_camera.m_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glBindTexture(GL_TEXTURE_2D, 0);
-
-
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_tex, 0);
-
-	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-		std::cout << "fuck!";
-		exit(1);
-	}
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 }
 
@@ -311,42 +293,26 @@ void Test::Step(Settings& settings)
 	m_world->SetSubStepping(settings.m_enableSubStepping);
 
 	m_pointCount = 0;
-	glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	m_world->Step(timeStep, settings.m_velocityIterations, settings.m_positionIterations);
 
 
-	glBindTexture(GL_TEXTURE_2D, m_tex);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, g_camera.m_width, g_camera.m_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glBindTexture(GL_TEXTURE_2D, 0);
+	//glBindTexture(GL_TEXTURE_2D, m_tex);
+	//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, g_camera.m_width, g_camera.m_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	//glBindTexture(GL_TEXTURE_2D, 0);
+
+	//glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	m_world->DebugDraw();
     g_debugDraw.Flush();
 
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     ImGui::SetNextWindowPos({0.0f, 0.0f});
     ImGui::SetNextWindowSize({float(g_camera.m_width), float(g_camera.m_height)});
 
-    ImGui::Begin("Viewport", &g_debugDraw.m_showUI, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
-
-   // ImGui::Begin("Viewport", nullptr);
-
-	ImVec2 pos = ImGui::GetCursorScreenPos();
-	const float window_width = ImGui::GetContentRegionAvail().x;
-	const float window_height = ImGui::GetContentRegionAvail().y;
-
-	ImGui::GetWindowDrawList()->AddImage(
-		reinterpret_cast<void*>(m_tex),
-		ImVec2(pos.x, pos.y),
-		ImVec2(pos.x + window_width, pos.y + window_height),
-		ImVec2(0, 1),
-		ImVec2(1, 0)
-	);
-	ImGui::End(); // End of the Viewport window
+    //ImGui::Begin("Viewport", &g_debugDraw.m_showUI);
 
 	if (timeStep > 0.0f)
 	{
