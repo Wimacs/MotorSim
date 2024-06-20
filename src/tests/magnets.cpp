@@ -79,7 +79,7 @@ public:
 
     enum
     {
-        e_count = 2
+        e_count = 50
     };
 
     Magnets()
@@ -168,27 +168,45 @@ public:
 			uniform mat4 inversProjectionMatrix;
 			uniform vec2 positions[100];
 			uniform vec2 moments[100];
+			uniform float mu;
 			uniform int numPos;
 			const float k = 8.0;
 
-            float signedDistanceTriangle(vec2 p0, vec2 p1, vec2 p2) {
-              vec2 e0 = (p1 - p0);
-              vec2 e1 = (p2 - p1);
-              vec2 e2 = (p0 - p2);
-              vec2 v0 = p0;
-              vec2 v1 = p1;
-              vec2 v2 = p2;
-              vec2 pq0 = v0 - e0 * clamp(dot(v0, e0) / dot(e0, e0), 0., 1.);
-              vec2 pq1 = v1 - e1 * clamp(dot(v1, e1) / dot(e1, e1), 0., 1.);
-              vec2 pq2 = v2 - e2 * clamp(dot(v2, e2) / dot(e2, e2), 0., 1.);
-              float s = sign(e0.x * e2.y - e0.y * e2.x);
-              vec2 d = min(min(vec2(dot(pq0, pq0), s * (v0.x * e0.y - v0.y * e0.x)),
-                               vec2(dot(pq1, pq1), s * (v1.x * e1.y - v1.y * e1.x))),
-                               vec2(dot(pq2, pq2), s * (v2.x * e2.y - v2.y * e2.x)));
-              return -sqrt(d.x) * sign(d.y);
-            }
+			float dot2(vec2 v) { return dot(v, v); }
+
+			// Calculate the signed distance from point p to triangle defined by points a, b, c
+			float sdTriangle(vec2 p, vec2 a, vec2 b, vec2 c) {
+			    vec2 ba = b - a; vec2 pa = p - a;
+			    vec2 cb = c - b; vec2 pb = p - b;
+			    vec2 ac = a - c; vec2 pc = p - c;
+			    
+			    vec2 nor = vec2(ba.y, -ba.x);
+			    
+			    // Determine whether point is inside the triangle using edge signs
+			    float signPA = sign(dot(nor, pa));
+			    nor = vec2(cb.y, -cb.x);
+			    float signPB = sign(dot(nor, pb));
+			    nor = vec2(ac.y, -ac.x);
+			    float signPC = sign(dot(nor, pc));
+			    
+			    // If the point is inside the triangle, all signs will be positive
+			    bool isInside = (signPA > 0.0) && (signPB > 0.0) && (signPC > 0.0);
+
+			    // Compute distance to the edges
+			    float d = min(min(
+			        dot2(pa - ba * clamp(dot(pa, ba) / dot2(ba), 0.0, 1.0)),
+			        dot2(pb - cb * clamp(dot(pb, cb) / dot2(cb), 0.0, 1.0))),
+			        dot2(pc - ac * clamp(dot(pc, ac) / dot2(ac), 0.0, 1.0)));
+			    
+			    d = sqrt(d);
+			    
+			    // Return the distance with correct sign
+			    return isInside ? -d : d;
+			}
+
 			void main()
 			{
+				float offset =1.5;
 			    vec2 B = vec2(0.0, 0.0);
                 vec2 pixPos = (inversProjectionMatrix * vec4(fragCoord, 0.0, 1.0)).xy;
 			    for(int i = 0; i < numPos; ++i)
@@ -196,25 +214,43 @@ public:
 			        vec2 dir = pixPos - positions[i];
 			        float distance = length(dir);
 					vec2 NIK = (1.0/distance) * dir;
-					if (distance > 0.01)
+					if (distance > 0.001)
 					{
 			        B +=
 			        1.0f / (distance * distance * distance) *
 			        (3.0f * dot(NIK, moments[i]) * NIK - moments[i]);
 					}
 			    }
-
-			    float magnitude = length(B);
-			    vec4 fieldColor = vec4((0.5 + 0.5 * B / magnitude).x, 0.0, (0.5 + 0.5 * B / magnitude).y, 0.2);
+				B = B * mu;
+				float magnitude = length(B);
+				vec2 NormB = B / magnitude;
+			    vec4 fieldColor = vec4(0.0, 0.0, magnitude * 1000, 0.2);
 			    color = fieldColor;
-                vec2 indicatorPixelLoc = pixPos - vec2(mod(pixPos.x, 5.0), mod(pixPos.y, 5.0));
 
-                vec2 triDir = indicatorPixelLoc + B / magnitude;
-                vec2 triB0  = indicatorPixelLoc + vec2((B / magnitude).y, -(B / magnitude).x);
-                vec2 triB1  = indicatorPixelLoc - vec2((B / magnitude).y, -(B / magnitude).x);
-                float indicatorArrowDistanceField = signedDistanceTriangle(triDir, triB0, triB1);
 
-                if (indicatorArrowDistanceField <= 1e-4)
+				vec2 indicatorPixelLoc = pixPos - vec2(mod(pixPos.x, offset), mod(pixPos.y, offset)) + vec2(offset, offset) * 0.5;
+				B = vec2(0.0, 0.0);
+			    for(int i = 0; i < numPos; ++i)
+			    {
+			        vec2 dir = indicatorPixelLoc - positions[i];
+			        float distance = length(dir);
+					vec2 NIK = (1.0/distance) * dir;
+					if (distance > 0.001)
+					{
+			        B +=
+			        1.0f / (distance * distance * distance) *
+			        (3.0f * dot(NIK, moments[i]) * NIK - moments[i]);
+					}
+			    }
+				magnitude = length(B);
+				NormB = B / magnitude;
+                
+                vec2 triDir = indicatorPixelLoc + NormB * 0.8;
+                vec2 triB0  = indicatorPixelLoc + vec2(NormB.y, -NormB.x) * 0.1;
+                vec2 triB1  = indicatorPixelLoc - vec2(NormB.y, -NormB.x)* 0.1;
+                float indicatorArrowDistanceField = sdTriangle(pixPos, triB0, triB1,triDir);
+
+                if (indicatorArrowDistanceField < 0)
                     color = vec4(vec3(1.) - fieldColor.xyz, 0.2);
 			}
 			)";
@@ -257,7 +293,7 @@ public:
         ImGui::Begin("Sensor Controls", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
 
         //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        ImGui::SliderFloat("mu", &m_nu, 0.1f, 200000.0f, "%.0f");
+        ImGui::SliderFloat("mu", &m_nu, 0.0f, 25000.0f, "%.0f");
 
         //glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
         //glBindTexture(GL_TEXTURE_2D, m_tex);
@@ -316,6 +352,8 @@ public:
         GLint numPosLoc = glGetUniformLocation(shaderProgram, "numPos");
         GLint projectionLoc = glGetUniformLocation(shaderProgram, "projectionMatrix");
         GLint invprojectionLoc = glGetUniformLocation(shaderProgram, "inversProjectionMatrix");
+        GLint muLoc = glGetUniformLocation(shaderProgram, "mu");
+
 
         float proj[16] = { 0.0f };
         float invproj[16] = { 0.0f };
@@ -327,6 +365,7 @@ public:
 
         glUniform2fv(positionsLoc, e_count, positionsFlat.data());
         glUniform2fv(momentsLoc, e_count, momentFlat.data());
+        glUniform1f(muLoc, m_nu / 20000.0);
 
         glUniform1i(numPosLoc, e_count);
         glBindVertexArray(VAO);
