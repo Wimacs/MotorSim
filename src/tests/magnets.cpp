@@ -171,12 +171,29 @@ public:
 			uniform int numPos;
 			const float k = 8.0;
 
+            float signedDistanceTriangle(vec2 p0, vec2 p1, vec2 p2) {
+              vec2 e0 = (p1 - p0);
+              vec2 e1 = (p2 - p1);
+              vec2 e2 = (p0 - p2);
+              vec2 v0 = p0;
+              vec2 v1 = p1;
+              vec2 v2 = p2;
+              vec2 pq0 = v0 - e0 * clamp(dot(v0, e0) / dot(e0, e0), 0., 1.);
+              vec2 pq1 = v1 - e1 * clamp(dot(v1, e1) / dot(e1, e1), 0., 1.);
+              vec2 pq2 = v2 - e2 * clamp(dot(v2, e2) / dot(e2, e2), 0., 1.);
+              float s = sign(e0.x * e2.y - e0.y * e2.x);
+              vec2 d = min(min(vec2(dot(pq0, pq0), s * (v0.x * e0.y - v0.y * e0.x)),
+                               vec2(dot(pq1, pq1), s * (v1.x * e1.y - v1.y * e1.x))),
+                               vec2(dot(pq2, pq2), s * (v2.x * e2.y - v2.y * e2.x)));
+              return -sqrt(d.x) * sign(d.y);
+            }
 			void main()
 			{
 			    vec2 B = vec2(0.0, 0.0);
+                vec2 pixPos = (inversProjectionMatrix * vec4(fragCoord, 0.0, 1.0)).xy;
 			    for(int i = 0; i < numPos; ++i)
 			    {
-			        vec2 dir = (inversProjectionMatrix * vec4(fragCoord, 0.0, 1.0)).xy - positions[i];
+			        vec2 dir = pixPos - positions[i];
 			        float distance = length(dir);
 					vec2 NIK = (1.0/distance) * dir;
 					if (distance > 0.01)
@@ -190,6 +207,15 @@ public:
 			    float magnitude = length(B);
 			    vec4 fieldColor = vec4((0.5 + 0.5 * B / magnitude).x, 0.0, (0.5 + 0.5 * B / magnitude).y, 0.2);
 			    color = fieldColor;
+                vec2 indicatorPixelLoc = pixPos - vec2(mod(pixPos.x, 5.0), mod(pixPos.y, 5.0));
+
+                vec2 triDir = indicatorPixelLoc + B / magnitude;
+                vec2 triB0  = indicatorPixelLoc + vec2((B / magnitude).y, -(B / magnitude).x);
+                vec2 triB1  = indicatorPixelLoc - vec2((B / magnitude).y, -(B / magnitude).x);
+                float indicatorArrowDistanceField = signedDistanceTriangle(triDir, triB0, triB1);
+
+                if (indicatorArrowDistanceField <= 1e-4)
+                    color = vec4(vec3(1.) - fieldColor.xyz, 0.2);
 			}
 			)";
 
@@ -236,7 +262,7 @@ public:
         //glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
         //glBindTexture(GL_TEXTURE_2D, m_tex);
         //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    	for (int i = -40; i < 40; i++)
+    	/*for (int i = -40; i < 40; i++)
         {
             for (int j = 0; j < 40; j++)
             {
@@ -254,7 +280,7 @@ public:
                 float ScaleB = B.Length();
                 g_debugDraw.DrawSegment(PosK, PosK + 1.0f * NormB, b2Color(NormB.x,NormB.y,0,0));
             }
-        }
+        }*/
         positionsFlat.clear();
         momentFlat.clear();
         for (int32 ii = 0; ii < e_count; ++ii)
