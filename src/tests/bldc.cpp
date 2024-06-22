@@ -115,7 +115,7 @@ public:
             bd.type = b2_dynamicBody;
             bd.position.Set(0.0f, 15.0f);
             bd.allowSleep = false;
-            bd.angularDamping = 6;
+            bd.angularDamping =100;
             b2Body* body = m_world->CreateBody(&bd);
             body->CreateFixture(&shape, 5.0f);
 
@@ -383,28 +383,34 @@ public:
 
 
         if (m_motorState <= 10)
-            Stators[0].isConduction = true;
+            Stators[0].isConduction = 1;
         else if (m_motorState > 10 && m_motorState <= 20)
-            Stators[1].isConduction = true;
+            Stators[1].isConduction = 1;
         else if (m_motorState > 20 && m_motorState <= 30)
-            Stators[2].isConduction = true;
+            Stators[2].isConduction = 1;
         else if (m_motorState > 30 && m_motorState <= 40)
-        {
-            Stators[3].isConduction = true;
-        }
+            Stators[3].isConduction = 1;
+        else if (m_motorState > 40 && m_motorState <= 50)
+            Stators[0].isConduction = 2;
+        else if (m_motorState > 50 && m_motorState <= 60)
+            Stators[1].isConduction = 2;
+        else if (m_motorState > 60 && m_motorState <= 70)
+            Stators[2].isConduction = 2;
+        else if (m_motorState > 70 && m_motorState <= 80)
+            Stators[3].isConduction = 2;
 
-        if (m_motorState > 40)
+        if (m_motorState > 80)
             m_motorState = 0;
 
-        //if (ImGui::Checkbox("Motor", &m_enableMotor))
-        //{
-        //    m_joint->EnableMotor(m_enableMotor);
-        //}
+        if (ImGui::Checkbox("Motor", &m_enableMotor))
+        {
+            m_joint->EnableMotor(m_enableMotor);
+        }
 
-        //if (ImGui::SliderFloat("Speed", &m_motorSpeed, -100.0f, 100.0f, "%.0f"))
-        //{
-        //    m_joint->SetMotorSpeed(m_motorSpeed);
-        //}
+        if (ImGui::SliderFloat("Speed", &m_motorSpeed, -100.0f, 100.0f, "%.0f"))
+        {
+            m_joint->SetMotorSpeed(m_motorSpeed);
+        }
         ImGui::End();
 
         for (auto stator : Stators)
@@ -449,7 +455,7 @@ public:
         float totalTorque = 0;
         for (auto stator : Stators)
         {
-            if (stator.isConduction)
+            if (stator.isConduction == 1)
             {
                 b2Vec2 PosI = stator.coil[0]->GetPosition();
                 b2Vec2 MomentI = b2Mul(stator.coil[0]->GetTransform().q, b2Vec2(1.0f, 0.0f));
