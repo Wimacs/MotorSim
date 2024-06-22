@@ -78,7 +78,7 @@ struct stator
 {
     b2Body* coil[2];
     b2Fixture* coilFixture[2];
-    bool isConduction = false;
+    int isConduction = 0;
 };
 class bldc : public Test
 {
@@ -101,6 +101,8 @@ public:
             ground->CreateFixture(&shape, 0.0f);
         }
 
+        m_world->SetGravity(b2Vec2(0.0f, 0.0f));
+
         m_enableLimit = true;
         m_enableMotor = false;
         m_motorSpeed = 10.0f;
@@ -113,7 +115,7 @@ public:
             bd.type = b2_dynamicBody;
             bd.position.Set(0.0f, 15.0f);
             bd.allowSleep = false;
-            bd.angularDamping = 10;
+            bd.angularDamping = 6;
             b2Body* body = m_world->CreateBody(&bd);
             body->CreateFixture(&shape, 5.0f);
 
@@ -367,10 +369,32 @@ public:
         ImGui::SetNextWindowSize(ImVec2(200.0f, 100.0f));
         ImGui::Begin("Joint Controls", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
 
-        ImGui::Checkbox("stator pair 0", &Stators[0].isConduction);
-        ImGui::Checkbox("stator pair 1", &Stators[1].isConduction);
-        ImGui::Checkbox("stator pair 2", &Stators[2].isConduction);
-        ImGui::Checkbox("stator pair 3", &Stators[3].isConduction);
+
+        ImGui::SliderInt("stator pair 0", &Stators[0].isConduction, 0, 2);
+        ImGui::SliderInt("stator pair 1", &Stators[1].isConduction, 0, 2);
+        ImGui::SliderInt("stator pair 2", &Stators[2].isConduction, 0, 2);
+        ImGui::SliderInt("stator pair 3", &Stators[3].isConduction, 0, 2);
+
+
+        m_motorState += 1;
+
+        for (auto& stator : Stators)
+            stator.isConduction = false;
+
+
+        if (m_motorState <= 10)
+            Stators[0].isConduction = true;
+        else if (m_motorState > 10 && m_motorState <= 20)
+            Stators[1].isConduction = true;
+        else if (m_motorState > 20 && m_motorState <= 30)
+            Stators[2].isConduction = true;
+        else if (m_motorState > 30 && m_motorState <= 40)
+        {
+            Stators[3].isConduction = true;
+        }
+
+        if (m_motorState > 40)
+            m_motorState = 0;
 
         //if (ImGui::Checkbox("Motor", &m_enableMotor))
         //{
@@ -411,19 +435,44 @@ public:
                 g_debugDraw.DrawSolidPolygon(vertices, vertexCount, b2Color(1.0, 0.0, 1.0, 1.0));
 	        }
         }
+
+
     }
 
     void Step(Settings& settings) override
     {
         Test::Step(settings);
 
+        b2Vec2 PosK = m_rotor->GetPosition();
+        b2Vec2 MomentK = b2Mul(m_rotor->GetTransform().q, b2Vec2(1.0f, 0.0f));
+
+        float totalTorque = 0;
         for (auto stator : Stators)
         {
             if (stator.isConduction)
             {
+                b2Vec2 PosI = stator.coil[0]->GetPosition();
+                b2Vec2 MomentI = b2Mul(stator.coil[0]->GetTransform().q, b2Vec2(1.0f, 0.0f));
+                totalTorque += ComputeMagetTorque(PosK, PosI, MomentK, MomentI);
+
+            	PosI = stator.coil[1]->GetPosition();
+                MomentI = b2Mul(stator.coil[1]->GetTransform().q, b2Vec2(1.0f, 0.0f));
+                totalTorque += ComputeMagetTorque(PosK, PosI, MomentK, MomentI);
+            }
+            else if (stator.isConduction == 2)
+            {
+                b2Vec2 PosI = stator.coil[0]->GetPosition();
+                b2Vec2 MomentI = b2Mul(stator.coil[0]->GetTransform().q, b2Vec2(-1.0f, 0.0f));
+                totalTorque += ComputeMagetTorque(PosK, PosI, MomentK, MomentI);
+
+                PosI = stator.coil[1]->GetPosition();
+                MomentI = b2Mul(stator.coil[1]->GetTransform().q, b2Vec2(-1.0f, 0.0f));
+                totalTorque += ComputeMagetTorque(PosK, PosI, MomentK, MomentI);
             }
         }
-
+        totalTorque *= m_nu / 4.0f * 3.14159f;
+        if (m_rotor)
+			m_rotor->ApplyTorque(totalTorque, true);
     }
 
     b2Vec2 ComputeMagetForce(b2Vec2 PosK, b2Vec2 PosI, b2Vec2 MomentK, b2Vec2 MomentI)
@@ -469,7 +518,7 @@ public:
     std::vector<stator> Stators;
     b2Body* m_rotor;
     float m_force;
-    float m_nu = 20000;
+    float m_nu = 2000000;
 
     std::vector<float> positionsFlat;
     std::vector<float> momentFlat;
@@ -487,6 +536,7 @@ public:
     bool m_enableMotor;
     bool m_enableLimit;
 
+    int m_motorState = 0;
 
 };
 
