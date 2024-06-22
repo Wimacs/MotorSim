@@ -115,7 +115,7 @@ public:
             bd.type = b2_dynamicBody;
             bd.position.Set(0.0f, 15.0f);
             bd.allowSleep = false;
-            bd.angularDamping =100;
+            bd.angularDamping =10;
             b2Body* body = m_world->CreateBody(&bd);
             body->CreateFixture(&shape, 5.0f);
 
@@ -376,32 +376,6 @@ public:
         ImGui::SliderInt("stator pair 3", &Stators[3].isConduction, 0, 2);
 
 
-        m_motorState += 1;
-
-        for (auto& stator : Stators)
-            stator.isConduction = false;
-
-
-        if (m_motorState <= 10)
-            Stators[0].isConduction = 1;
-        else if (m_motorState > 10 && m_motorState <= 20)
-            Stators[1].isConduction = 1;
-        else if (m_motorState > 20 && m_motorState <= 30)
-            Stators[2].isConduction = 1;
-        else if (m_motorState > 30 && m_motorState <= 40)
-            Stators[3].isConduction = 1;
-        else if (m_motorState > 40 && m_motorState <= 50)
-            Stators[0].isConduction = 2;
-        else if (m_motorState > 50 && m_motorState <= 60)
-            Stators[1].isConduction = 2;
-        else if (m_motorState > 60 && m_motorState <= 70)
-            Stators[2].isConduction = 2;
-        else if (m_motorState > 70 && m_motorState <= 80)
-            Stators[3].isConduction = 2;
-
-        if (m_motorState > 80)
-            m_motorState = 0;
-
         if (ImGui::Checkbox("Motor", &m_enableMotor))
         {
             m_joint->EnableMotor(m_enableMotor);
@@ -479,6 +453,33 @@ public:
         totalTorque *= m_nu / 4.0f * 3.14159f;
         if (m_rotor)
 			m_rotor->ApplyTorque(totalTorque, true);
+
+
+        m_motorState += 1;
+
+        for (auto& stator : Stators)
+            stator.isConduction = false;
+
+
+        if (m_motorState <= 1)
+            Stators[0].isConduction = 1;
+        else if (m_motorState > 1 && m_motorState <= 2)
+            Stators[1].isConduction = 1;
+        else if (m_motorState > 2 && m_motorState <= 3)
+            Stators[2].isConduction = 1;
+        else if (m_motorState > 3 && m_motorState <= 4)
+            Stators[3].isConduction = 1;
+        else if (m_motorState > 4 && m_motorState <= 5)
+            Stators[0].isConduction = 2;
+        else if (m_motorState > 5 && m_motorState <= 6)
+            Stators[1].isConduction = 2;
+        else if (m_motorState > 6 && m_motorState <= 7)
+            Stators[2].isConduction = 2;
+        else if (m_motorState > 7 && m_motorState <= 8)
+            Stators[3].isConduction = 2;
+
+        if (m_motorState > 8)
+            m_motorState = 1;
     }
 
     b2Vec2 ComputeMagetForce(b2Vec2 PosK, b2Vec2 PosI, b2Vec2 MomentK, b2Vec2 MomentI)
@@ -542,7 +543,7 @@ public:
     bool m_enableMotor;
     bool m_enableLimit;
 
-    int m_motorState = 0;
+    int m_motorState = 1;
 
 };
 

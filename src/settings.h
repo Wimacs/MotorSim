@@ -34,7 +34,7 @@ struct Settings
 		m_testIndex = 0;
 		m_windowWidth = 1600;
 		m_windowHeight = 900;
-		m_hertz = 60.0f;
+		m_hertz = 480.0f;
 		m_velocityIterations = 8;
 		m_positionIterations = 3;
 		m_drawShapes = true;
