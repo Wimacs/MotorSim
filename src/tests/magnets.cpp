@@ -224,7 +224,8 @@ public:
 				B = B * mu;
 				float magnitude = length(B);
 				vec2 NormB = B / magnitude;
-			    vec4 fieldColor = vec4(0.0, 0.0, magnitude * 1000, 0.2);
+			    vec4 fieldColor = vec4(int(magnitude / 0.01) * 0.05, 1 - int(magnitude / 0.01)* 0.05, 1 - int(magnitude / 0.01)* 0.01, 0.35);
+
 			    color = fieldColor;
 
 
