@@ -31,6 +31,12 @@ add_library(imgui_toggle STATIC ${IMGUI_TOGGLE_SOURCES})
 target_include_directories(imgui_toggle PUBLIC extern/imgui_toggle)
 target_link_libraries(imgui_toggle PUBLIC imgui)
 
+# Build Implot
+file(GLOB IMPLOT_SRC extern/implot/*.cpp extern/implot/*.h)
+add_library(implot STATIC ${IMPLOT_SRC})
+target_include_directories(implot PUBLIC extern/implot)
+target_link_libraries(implot PUBLIC imgui)
+
 # Add stb
 add_library(stb INTERFACE)
 target_include_directories(stb INTERFACE extern/stb)

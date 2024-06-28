@@ -7,7 +7,7 @@ target_include_directories(magnet PRIVATE ${PROJECT_SOURCE_DIR}/src)
 
 # Link libraries
 find_package(OpenGL REQUIRED)
-target_link_libraries(magnet PRIVATE glad glfw glm::glm-header-only imgui imgui_toggle OpenGL::GL stb box2d sajson)
+target_link_libraries(magnet PRIVATE glad glfw glm::glm-header-only imgui imgui_toggle OpenGL::GL stb box2d sajson implot)
 
 # Set executable directory
 set_target_properties(magnet PROPERTIES
