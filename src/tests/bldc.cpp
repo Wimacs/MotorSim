@@ -4,9 +4,11 @@
 
 #include <iostream>
 #include <vector>
+
 #include "settings.h"
 #include "scene.h"
 #include "imgui/imgui.h"
+#include "implot/implot.h"
 
 // This shows how to use sensor shapes. Sensors don't have collision, but report overlap events.
 static void sPrintLog(GLuint object)
@@ -80,6 +82,8 @@ struct stator
     b2Fixture* coilFixture[2];
     int isConduction = 0;
 };
+
+
 class bldc : public Test
 {
 public:
@@ -91,14 +95,11 @@ public:
 
     bldc()
     {
+        ImPlot::CreateContext();
         b2Body* ground = NULL;
         {
             b2BodyDef bd;
             ground = m_world->CreateBody(&bd);
-
-            b2EdgeShape shape;
-            shape.SetTwoSided(b2Vec2(-40.0f, 0.0f), b2Vec2(40.0f, 0.0f));
-            ground->CreateFixture(&shape, 0.0f);
         }
 
         m_world->SetGravity(b2Vec2(0.0f, 0.0f));
@@ -109,15 +110,15 @@ public:
 
         {
             b2CircleShape shape;
-            shape.m_radius = 2.0f;
+            shape.m_radius = 5.0f;
 
             b2BodyDef bd;
             bd.type = b2_dynamicBody;
-            bd.position.Set(0.0f, 15.0f);
+            bd.position.Set(0.0f, 20.0f);
             bd.allowSleep = false;
-            bd.angularDamping =10;
+            bd.angularDamping = 45.0f;
             b2Body* body = m_world->CreateBody(&bd);
-            body->CreateFixture(&shape, 5.0f);
+            body->CreateFixture(&shape, 0.005f);
 
 
             b2WheelJointDef jd;
@@ -135,76 +136,299 @@ public:
 
 
             b2PolygonShape coilShape;
-            coilShape.SetAsBox(0.5f, 0.5f);
+            coilShape.SetAsBox(0.6f, 1.2f);
 
-            float triC = 2.82842712474619f;
-            float triA = 2.0f;
-            float triB = 2.0f;
 
-        	b2BodyDef bdcoil;
+            const float pi = 3.14159265358979323846f;
+            const float radius = 6.0f; // triC
+            b2BodyDef bdcoil;
+            std::vector<b2Body*> coilArray;
             bdcoil.type = b2_staticBody;
-            bdcoil.position.Set(0.0f, 15.0f + triC);
-            bdcoil.angle = 0.5f * b2_pi;
-			b2Body* coil0 = m_world->CreateBody(&bdcoil);
-            bdcoil.position.Set(0.0f + triA, 15.0f + triB);
-            bdcoil.angle = 0.25 * b2_pi;
-            b2Body* coil1 = m_world->CreateBody(&bdcoil);
-            bdcoil.position.Set(0.0f + triC, 15.0f);
-            bdcoil.angle = 0.0f * b2_pi;
-            b2Body* coil2 = m_world->CreateBody(&bdcoil);
-            bdcoil.position.Set(0.0f - triA, 15.0f + triB);
-            bdcoil.angle = 1.75f * b2_pi;
-            b2Body* coil3 = m_world->CreateBody(&bdcoil);
-            bdcoil.position.Set(0.0f - triC, 15.0f);
-            bdcoil.angle = 0.0f * b2_pi;
-            b2Body* coil4 = m_world->CreateBody(&bdcoil);
-            bdcoil.position.Set(0.0f - triA, 15.0f - triB);
-            bdcoil.angle = 0.25f * b2_pi;
-            b2Body* coil5 = m_world->CreateBody(&bdcoil);
-            bdcoil.position.Set(0.0f, 15.0f - triC);
-            bdcoil.angle = 0.5f * b2_pi;
-            b2Body* coil6 = m_world->CreateBody(&bdcoil);
-            bdcoil.position.Set(0.0f + triA, 15.0f - triB);
-            bdcoil.angle = 1.75f * b2_pi;
-            b2Body* coil7 = m_world->CreateBody(&bdcoil);
+            float centerX = 0.0f;
+            float centerY = 20.0f;
 
-			b2Fixture* coilFixture0 = coil0->CreateFixture(&coilShape, 5.0f);
-            b2Fixture* coilFixture1 = coil1->CreateFixture(&coilShape, 5.0f);
-            b2Fixture* coilFixture2 = coil2->CreateFixture(&coilShape, 5.0f);
-            b2Fixture* coilFixture3 = coil3->CreateFixture(&coilShape, 5.0f);
-            b2Fixture* coilFixture4 = coil4->CreateFixture(&coilShape, 5.0f);
-            b2Fixture* coilFixture5 = coil5->CreateFixture(&coilShape, 5.0f);
-            b2Fixture* coilFixture6 = coil6->CreateFixture(&coilShape, 5.0f);
-            b2Fixture* coilFixture7 = coil7->CreateFixture(&coilShape, 5.0f);
+
+            for (int i = 0; i < 3; ++i) {
+                float angle = i * (pi / 3); // 60 degrees in radians
+                float x = centerX + radius * cos(angle);
+                float y = centerY + radius * sin(angle);
+
+                // Create the first box
+                bdcoil.position.Set(x, y);
+                bdcoil.angle = angle;
+                m_world->CreateBody(&bdcoil);
+                coilArray.push_back(m_world->CreateBody(&bdcoil));
+
+                // Create the opposite box
+                bdcoil.position.Set(centerX - (x - centerX), centerY - (y - centerY));
+                bdcoil.angle = angle; // add 180 degrees to the angle for the opposite box
+                m_world->CreateBody(&bdcoil);
+                coilArray.push_back(m_world->CreateBody(&bdcoil));
+
+            }
+
+			b2Fixture* coilFixture0 = coilArray[0]->CreateFixture(&coilShape, 5.0f);
+            b2Fixture* coilFixture1 = coilArray[1]->CreateFixture(&coilShape, 5.0f);
+            b2Fixture* coilFixture2 = coilArray[2]->CreateFixture(&coilShape, 5.0f);
+            b2Fixture* coilFixture3 = coilArray[3]->CreateFixture(&coilShape, 5.0f);
+            b2Fixture* coilFixture4 = coilArray[4]->CreateFixture(&coilShape, 5.0f);
+            b2Fixture* coilFixture5 = coilArray[5]->CreateFixture(&coilShape, 5.0f);
 
             m_rotor = body;
             stator statorPair;
-            statorPair.coil[0] = coil0;
-            statorPair.coil[1] = coil6;
+            statorPair.coil[0] = coilArray[0];
+            statorPair.coil[1] = coilArray[1];
             statorPair.coilFixture[0] = coilFixture0;
-            statorPair.coilFixture[1] = coilFixture6;
+            statorPair.coilFixture[1] = coilFixture3;
             Stators.push_back(statorPair);
-            statorPair.coil[0] = coil1;
-            statorPair.coil[1] = coil5;
+            statorPair.coil[0] = coilArray[2];
+            statorPair.coil[1] = coilArray[3];
             statorPair.coilFixture[0] = coilFixture1;
-            statorPair.coilFixture[1] = coilFixture5;
-            Stators.push_back(statorPair);
-            statorPair.coil[0] = coil2;
-            statorPair.coil[1] = coil4;
-            statorPair.coilFixture[0] = coilFixture2;
             statorPair.coilFixture[1] = coilFixture4;
             Stators.push_back(statorPair);
-            statorPair.coil[0] = coil3;
-            statorPair.coil[1] = coil7;
-            statorPair.coilFixture[0] = coilFixture3;
-            statorPair.coilFixture[1] = coilFixture7;
+            statorPair.coil[0] = coilArray[4];
+            statorPair.coil[1] = coilArray[5];
+            statorPair.coilFixture[0] = coilFixture2;
+            statorPair.coilFixture[1] = coilFixture5;
             Stators.push_back(statorPair);
-        }
 
+        }
+        glInit();
+    }
+
+    ~bldc()
+    {
+        glDeleteVertexArrays(1, &VAO);
+        glDeleteBuffers(1, &VBO);
+        glDeleteProgram(shaderProgram);
+    }
+
+    // Implement contact listener.
+    void BeginContact(b2Contact* contact) override
+    {
+    }
+
+    // Implement contact listener.
+    void EndContact(b2Contact* contact) override
+    {
+    }
+
+    // utility structure for realtime plot
+    struct ScrollingBuffer {
+        int MaxSize;
+        int Offset;
+        ImVector<ImVec2> Data;
+        ScrollingBuffer(int max_size = 2000) {
+            MaxSize = max_size;
+            Offset = 0;
+            Data.reserve(MaxSize);
+        }
+        void AddPoint(float x, float y) {
+            if (Data.size() < MaxSize)
+                Data.push_back(ImVec2(x, y));
+            else {
+                Data[Offset] = ImVec2(x, y);
+                Offset = (Offset + 1) % MaxSize;
+            }
+        }
+        void Erase() {
+            if (Data.size() > 0) {
+                Data.shrink(0);
+                Offset = 0;
+            }
+        }
+    };
+
+    // utility structure for realtime plot
+    struct RollingBuffer {
+        float Span;
+        ImVector<ImVec2> Data;
+        RollingBuffer() {
+            Span = 10.0f;
+            Data.reserve(2000);
+        }
+        void AddPoint(float x, float y) {
+            float xmod = fmodf(x, Span);
+            if (!Data.empty() && xmod < Data.back().x)
+                Data.shrink(0);
+            Data.push_back(ImVec2(xmod, y));
+        }
+    };
+
+    void UpdateUI() override
+    {
+        t += ImGui::GetIO().DeltaTime;
+        static float history = 10.0f;
+        ImGui::SliderFloat("History", &history, 1, 30, "%.1f s");
+        rdata1.Span = history;
+        rdata2.Span = history;
+
+        static ImPlotAxisFlags flags = ImPlotAxisFlags_NoTickLabels;
+
+        if (ImPlot::BeginPlot("##Scrolling", ImVec2(-1, 150))) {
+            ImPlot::SetupAxes(NULL, NULL, flags, flags);
+            ImPlot::SetupAxisLimits(ImAxis_X1, t - history, t, ImGuiCond_Always);
+            ImPlot::SetupAxisLimits(ImAxis_Y1, 0, 1);
+            ImPlot::SetNextFillStyle(IMPLOT_AUTO_COL, 0.5f);
+            ImPlot::PlotShaded("Mouse X", &sdata1.Data[0].x, &sdata1.Data[0].y, sdata1.Data.size(), -INFINITY, 0, sdata1.Offset, 2 * sizeof(float));
+            ImPlot::PlotLine("Mouse Y", &sdata2.Data[0].x, &sdata2.Data[0].y, sdata2.Data.size(), 0, sdata2.Offset, 2 * sizeof(float));
+            ImPlot::EndPlot();
+        }
+        if (ImPlot::BeginPlot("##Rolling", ImVec2(-1, 150))) {
+            ImPlot::SetupAxes(NULL, NULL, flags, flags);
+            ImPlot::SetupAxisLimits(ImAxis_X1, 0, history, ImGuiCond_Always);
+            ImPlot::SetupAxisLimits(ImAxis_Y1, 0, 1);
+            ImPlot::PlotLine("Mouse X", &rdata1.Data[0].x, &rdata1.Data[0].y, rdata1.Data.size(), 0, 0, 2 * sizeof(float));
+            ImPlot::PlotLine("Mouse Y", &rdata2.Data[0].x, &rdata2.Data[0].y, rdata2.Data.size(), 0, 0, 2 * sizeof(float));
+            ImPlot::EndPlot();
+        }        ImGui::SetNextWindowPos(ImVec2(10.0f, 100.0f));
+        ImGui::SetNextWindowSize(ImVec2(200.0f, 100.0f));
+        ImGui::Begin("Joint Controls", nullptr);
+        ImGui::SliderInt("stator pair 0", &Stators[0].isConduction, 0, 2);
+        ImGui::SliderInt("stator pair 1", &Stators[1].isConduction, 0, 2);
+        ImGui::SliderInt("stator pair 2", &Stators[2].isConduction, 0, 2);
+
+
+        if (ImGui::Checkbox("Motor", &m_enableMotor))
         {
-
+            m_joint->EnableMotor(m_enableMotor);
         }
 
+        if (ImGui::SliderFloat("Speed", &m_motorSpeed, -100.0f, 100.0f, "%.0f"))
+        {
+            m_joint->SetMotorSpeed(m_motorSpeed);
+        }
+        ImGui::End();
+
+        for (auto stator : Stators)
+        {
+	        if (stator.isConduction)
+	        {
+                b2PolygonShape* poly = (b2PolygonShape*)stator.coilFixture[0]->GetShape();
+                int32 vertexCount = poly->m_count;
+                b2Assert(vertexCount <= b2_maxPolygonVertices);
+                b2Vec2 vertices[b2_maxPolygonVertices];
+
+                for (int32 i = 0; i < vertexCount; ++i)
+                {
+                    vertices[i] = b2Mul(stator.coil[0]->GetTransform(), poly->m_vertices[i]);
+                }
+
+                g_debugDraw.DrawSolidPolygon(vertices, vertexCount, b2Color(1.0, 0.0, 1.0, 1.0));
+
+                poly = (b2PolygonShape*)stator.coilFixture[1]->GetShape();
+				vertexCount = poly->m_count;
+                b2Assert(vertexCount <= b2_maxPolygonVertices);
+
+                for (int32 i = 0; i < vertexCount; ++i)
+                {
+                    vertices[i] = b2Mul(stator.coil[1]->GetTransform(), poly->m_vertices[i]);
+                }
+
+                g_debugDraw.DrawSolidPolygon(vertices, vertexCount, b2Color(1.0, 0.0, 1.0, 1.0));
+	        }
+        }
+
+
+    }
+
+    void Step(Settings& settings) override
+    {
+        Test::Step(settings);
+
+        b2Vec2 PosK = m_rotor->GetPosition();
+        b2Vec2 MomentK = b2Mul(m_rotor->GetTransform().q, b2Vec2(1.0f, 0.0f));
+
+        float totalTorque = 0;
+        for (auto stator : Stators)
+        {
+            if (stator.isConduction == 1)
+            {
+                b2Vec2 PosI = stator.coil[0]->GetPosition();
+                b2Vec2 MomentI = b2Mul(stator.coil[0]->GetTransform().q, b2Vec2(1.0f, 0.0f));
+                totalTorque += ComputeMagetTorque(PosK, PosI, MomentK, MomentI);
+
+            	PosI = stator.coil[1]->GetPosition();
+                MomentI = b2Mul(stator.coil[1]->GetTransform().q, b2Vec2(1.0f, 0.0f));
+                totalTorque += ComputeMagetTorque(PosK, PosI, MomentK, MomentI);
+            }
+            else if (stator.isConduction == 2)
+            {
+                b2Vec2 PosI = stator.coil[0]->GetPosition();
+                b2Vec2 MomentI = b2Mul(stator.coil[0]->GetTransform().q, b2Vec2(-1.0f, 0.0f));
+                totalTorque += ComputeMagetTorque(PosK, PosI, MomentK, MomentI);
+
+                PosI = stator.coil[1]->GetPosition();
+                MomentI = b2Mul(stator.coil[1]->GetTransform().q, b2Vec2(-1.0f, 0.0f));
+                totalTorque += ComputeMagetTorque(PosK, PosI, MomentK, MomentI);
+            }
+        }
+        totalTorque *= m_nu / 4.0f * 3.14159f;
+        if (m_rotor)
+			m_rotor->ApplyTorque(totalTorque, true);
+        sdata1.AddPoint(t, totalTorque * 0.0005f);
+        rdata1.AddPoint(t, totalTorque * 0.0005f);
+        sdata2.AddPoint(t, totalTorque * 0.0005f);
+        rdata2.AddPoint(t, totalTorque * 0.0005f);
+        //m_motorState += 1;
+
+        //for (auto& stator : Stators)
+        //    stator.isConduction = false;
+
+
+        //if (m_motorState <= 1)
+        //    Stators[0].isConduction = 1;
+        //else if (m_motorState > 1 && m_motorState <= 2)
+        //    Stators[1].isConduction = 1;
+        //else if (m_motorState > 2 && m_motorState <= 3)
+        //    Stators[2].isConduction = 1;
+        //else if (m_motorState > 4 && m_motorState <= 5)
+        //    Stators[0].isConduction = 2;
+        //else if (m_motorState > 5 && m_motorState <= 6)
+        //    Stators[1].isConduction = 2;
+        //else if (m_motorState > 6 && m_motorState <= 7)
+        //    Stators[2].isConduction = 2;
+
+        //if (m_motorState > 8)
+        //    m_motorState = 1;
+    }
+
+    b2Vec2 ComputeMagetForce(b2Vec2 PosK, b2Vec2 PosI, b2Vec2 MomentK, b2Vec2 MomentI)
+    {
+        b2Vec2 dir = PosK - PosI;
+        b2Vec2 NIK = 1.0f/dir.Length() * dir;
+        b2Vec2 MagnetForce =
+                1.0f / (dir.LengthSquared() * dir.LengthSquared()) *
+                ((-15.0f * ((b2Dot(MomentK, NIK) * b2Dot(MomentI, NIK))) * NIK) +
+                3.0f * b2Dot(MomentK, MomentI) * NIK +
+                3.0f * (b2Dot(MomentI, NIK) * MomentK + b2Dot(MomentK, NIK) * MomentI)) ;
+        return MagnetForce;
+    }
+
+    float ComputeMagetTorque(b2Vec2 PosK, b2Vec2 PosI, b2Vec2 MomentK, b2Vec2 MomentI)
+    {
+        b2Vec2 dir = PosK - PosI;
+        b2Vec2 NIK = 1.0f/dir.Length() * dir;
+        float MagnetTorque =
+        (3 * b2Cross(MomentK, NIK) * b2Dot(MomentI, NIK) -
+        b2Cross(MomentK, MomentI)) /
+        (dir.Length() * dir.Length() * dir.Length());
+        return MagnetTorque;
+    }
+
+    b2Vec2 ComputeMagetField(b2Vec2 PosK, b2Vec2 PosI, b2Vec2 MomentI)
+    {
+        b2Vec2 dir = PosK - PosI;
+        b2Vec2 NIK = 1.0f/dir.Length() * dir;
+        b2Vec2 B =
+        1.0f / (dir.Length() * dir.Length() * dir.Length()) *
+        (3.0f * b2Dot(NIK, MomentI) * NIK - MomentI);
+
+        return B;
+    }
+
+    void glInit()
+    {
         //gl stuff
         glGenFramebuffers(1, &m_fbo);
         glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
@@ -225,8 +449,7 @@ public:
         }
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-        {
-            const char* vertexShaderSource = R"(
+        const char* vertexShaderSource = R"(
 			#version 330 core
 			layout(location = 0) in vec2 position;
 			out vec2 fragCoord;
@@ -237,7 +460,7 @@ public:
 			}
 			)";
 
-            const char* fragmentShaderSource = R"(
+        const char* fragmentShaderSource = R"(
 			#version 330 core
 			in vec2 fragCoord;
 			out vec4 color;
@@ -332,188 +555,17 @@ public:
 			}
 			)";
 
-            shaderProgram = sCreateShaderProgram(vertexShaderSource, fragmentShaderSource);
-        	glGenVertexArrays(1, &VAO);
-            glGenBuffers(1, &VBO);
+        shaderProgram = sCreateShaderProgram(vertexShaderSource, fragmentShaderSource);
+        glGenVertexArrays(1, &VAO);
+        glGenBuffers(1, &VBO);
 
-            glBindVertexArray(VAO);
+        glBindVertexArray(VAO);
 
-            glBindBuffer(GL_ARRAY_BUFFER, VBO);
-            glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+        glBindBuffer(GL_ARRAY_BUFFER, VBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
-            glEnableVertexAttribArray(0);
-        }
-    }
-
-    ~bldc()
-    {
-        glDeleteVertexArrays(1, &VAO);
-        glDeleteBuffers(1, &VBO);
-        glDeleteProgram(shaderProgram);
-    }
-
-    // Implement contact listener.
-    void BeginContact(b2Contact* contact) override
-    {
-    }
-
-    // Implement contact listener.
-    void EndContact(b2Contact* contact) override
-    {
-    }
-
-    void UpdateUI() override
-    {
-        ImGui::SetNextWindowPos(ImVec2(10.0f, 100.0f));
-        ImGui::SetNextWindowSize(ImVec2(200.0f, 100.0f));
-        ImGui::Begin("Joint Controls", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
-
-
-        ImGui::SliderInt("stator pair 0", &Stators[0].isConduction, 0, 2);
-        ImGui::SliderInt("stator pair 1", &Stators[1].isConduction, 0, 2);
-        ImGui::SliderInt("stator pair 2", &Stators[2].isConduction, 0, 2);
-        ImGui::SliderInt("stator pair 3", &Stators[3].isConduction, 0, 2);
-
-
-        if (ImGui::Checkbox("Motor", &m_enableMotor))
-        {
-            m_joint->EnableMotor(m_enableMotor);
-        }
-
-        if (ImGui::SliderFloat("Speed", &m_motorSpeed, -100.0f, 100.0f, "%.0f"))
-        {
-            m_joint->SetMotorSpeed(m_motorSpeed);
-        }
-        ImGui::End();
-
-        for (auto stator : Stators)
-        {
-	        if (stator.isConduction)
-	        {
-                b2PolygonShape* poly = (b2PolygonShape*)stator.coilFixture[0]->GetShape();
-                int32 vertexCount = poly->m_count;
-                b2Assert(vertexCount <= b2_maxPolygonVertices);
-                b2Vec2 vertices[b2_maxPolygonVertices];
-
-                for (int32 i = 0; i < vertexCount; ++i)
-                {
-                    vertices[i] = b2Mul(stator.coil[0]->GetTransform(), poly->m_vertices[i]);
-                }
-
-                g_debugDraw.DrawSolidPolygon(vertices, vertexCount, b2Color(1.0, 0.0, 1.0, 1.0));
-
-                poly = (b2PolygonShape*)stator.coilFixture[1]->GetShape();
-				vertexCount = poly->m_count;
-                b2Assert(vertexCount <= b2_maxPolygonVertices);
-
-                for (int32 i = 0; i < vertexCount; ++i)
-                {
-                    vertices[i] = b2Mul(stator.coil[1]->GetTransform(), poly->m_vertices[i]);
-                }
-
-                g_debugDraw.DrawSolidPolygon(vertices, vertexCount, b2Color(1.0, 0.0, 1.0, 1.0));
-	        }
-        }
-
-
-    }
-
-    void Step(Settings& settings) override
-    {
-        Test::Step(settings);
-
-        b2Vec2 PosK = m_rotor->GetPosition();
-        b2Vec2 MomentK = b2Mul(m_rotor->GetTransform().q, b2Vec2(1.0f, 0.0f));
-
-        float totalTorque = 0;
-        for (auto stator : Stators)
-        {
-            if (stator.isConduction == 1)
-            {
-                b2Vec2 PosI = stator.coil[0]->GetPosition();
-                b2Vec2 MomentI = b2Mul(stator.coil[0]->GetTransform().q, b2Vec2(1.0f, 0.0f));
-                totalTorque += ComputeMagetTorque(PosK, PosI, MomentK, MomentI);
-
-            	PosI = stator.coil[1]->GetPosition();
-                MomentI = b2Mul(stator.coil[1]->GetTransform().q, b2Vec2(1.0f, 0.0f));
-                totalTorque += ComputeMagetTorque(PosK, PosI, MomentK, MomentI);
-            }
-            else if (stator.isConduction == 2)
-            {
-                b2Vec2 PosI = stator.coil[0]->GetPosition();
-                b2Vec2 MomentI = b2Mul(stator.coil[0]->GetTransform().q, b2Vec2(-1.0f, 0.0f));
-                totalTorque += ComputeMagetTorque(PosK, PosI, MomentK, MomentI);
-
-                PosI = stator.coil[1]->GetPosition();
-                MomentI = b2Mul(stator.coil[1]->GetTransform().q, b2Vec2(-1.0f, 0.0f));
-                totalTorque += ComputeMagetTorque(PosK, PosI, MomentK, MomentI);
-            }
-        }
-        totalTorque *= m_nu / 4.0f * 3.14159f;
-        if (m_rotor)
-			m_rotor->ApplyTorque(totalTorque, true);
-
-
-        m_motorState += 1;
-
-        for (auto& stator : Stators)
-            stator.isConduction = false;
-
-
-        if (m_motorState <= 1)
-            Stators[0].isConduction = 1;
-        else if (m_motorState > 1 && m_motorState <= 2)
-            Stators[1].isConduction = 1;
-        else if (m_motorState > 2 && m_motorState <= 3)
-            Stators[2].isConduction = 1;
-        else if (m_motorState > 3 && m_motorState <= 4)
-            Stators[3].isConduction = 1;
-        else if (m_motorState > 4 && m_motorState <= 5)
-            Stators[0].isConduction = 2;
-        else if (m_motorState > 5 && m_motorState <= 6)
-            Stators[1].isConduction = 2;
-        else if (m_motorState > 6 && m_motorState <= 7)
-            Stators[2].isConduction = 2;
-        else if (m_motorState > 7 && m_motorState <= 8)
-            Stators[3].isConduction = 2;
-
-        if (m_motorState > 8)
-            m_motorState = 1;
-    }
-
-    b2Vec2 ComputeMagetForce(b2Vec2 PosK, b2Vec2 PosI, b2Vec2 MomentK, b2Vec2 MomentI)
-    {
-        b2Vec2 dir = PosK - PosI;
-        b2Vec2 NIK = 1.0f/dir.Length() * dir;
-        b2Vec2 MagnetForce =
-                1.0f / (dir.LengthSquared() * dir.LengthSquared()) *
-                ((-15.0f * ((b2Dot(MomentK, NIK) * b2Dot(MomentI, NIK))) * NIK) +
-                3.0f * b2Dot(MomentK, MomentI) * NIK +
-                3.0f * (b2Dot(MomentI, NIK) * MomentK + b2Dot(MomentK, NIK) * MomentI)) ;
-        return MagnetForce;
-    }
-
-    float ComputeMagetTorque(b2Vec2 PosK, b2Vec2 PosI, b2Vec2 MomentK, b2Vec2 MomentI)
-    {
-        b2Vec2 dir = PosK - PosI;
-        b2Vec2 NIK = 1.0f/dir.Length() * dir;
-        float MagnetTorque =
-        (3 * b2Cross(MomentK, NIK) * b2Dot(MomentI, NIK) -
-        b2Cross(MomentK, MomentI)) /
-        (dir.Length() * dir.Length() * dir.Length());
-        return MagnetTorque;
-    }
-
-    b2Vec2 ComputeMagetField(b2Vec2 PosK, b2Vec2 PosI, b2Vec2 MomentI)
-    {
-        b2Vec2 dir = PosK - PosI;
-        b2Vec2 NIK = 1.0f/dir.Length() * dir;
-        b2Vec2 B =
-        1.0f / (dir.Length() * dir.Length() * dir.Length()) *
-        (3.0f * b2Dot(NIK, MomentI) * NIK - MomentI);
-
-        return B;
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(0);
     }
 
     static Test* Create()
@@ -525,7 +577,7 @@ public:
     std::vector<stator> Stators;
     b2Body* m_rotor;
     float m_force;
-    float m_nu = 2000000;
+    float m_nu = 10000000.0f;
 
     std::vector<float> positionsFlat;
     std::vector<float> momentFlat;
@@ -544,7 +596,9 @@ public:
     bool m_enableLimit;
 
     int m_motorState = 1;
-
+	ScrollingBuffer sdata1, sdata2;
+	RollingBuffer   rdata1, rdata2;
+     float t = 0;
 };
 
 static int testIndex = RegisterTest("Magnets", "bldc", bldc::Create);
