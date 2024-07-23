@@ -370,27 +370,28 @@ public:
         rdata1.AddPoint(t, totalTorque * 0.0005f);
         sdata2.AddPoint(t, totalTorque * 0.0005f);
         rdata2.AddPoint(t, totalTorque * 0.0005f);
-        //m_motorState += 1;
 
-        //for (auto& stator : Stators)
-        //    stator.isConduction = false;
+        if (m_motorState >= 70)
+            m_motorState = 0;
+        m_motorState += 1;
+
+        for (auto& stator : Stators)
+            stator.isConduction = false;
 
 
-        //if (m_motorState <= 1)
-        //    Stators[0].isConduction = 1;
-        //else if (m_motorState > 1 && m_motorState <= 2)
-        //    Stators[1].isConduction = 1;
-        //else if (m_motorState > 2 && m_motorState <= 3)
-        //    Stators[2].isConduction = 1;
-        //else if (m_motorState > 4 && m_motorState <= 5)
-        //    Stators[0].isConduction = 2;
-        //else if (m_motorState > 5 && m_motorState <= 6)
-        //    Stators[1].isConduction = 2;
-        //else if (m_motorState > 6 && m_motorState <= 7)
-        //    Stators[2].isConduction = 2;
+        if (m_motorState <= 10)
+            Stators[0].isConduction = 1;
+        else if (m_motorState > 10 && m_motorState <= 20)
+            Stators[1].isConduction = 1;
+        else if (m_motorState > 20 && m_motorState <= 30)
+            Stators[2].isConduction = 1;
+        else if (m_motorState > 40 && m_motorState <= 50)
+            Stators[0].isConduction = 2;
+        else if (m_motorState > 50 && m_motorState <= 60)
+            Stators[1].isConduction = 2;
+        else if (m_motorState > 60 && m_motorState <= 70)
+            Stators[2].isConduction = 2;
 
-        //if (m_motorState > 8)
-        //    m_motorState = 1;
     }
 
     b2Vec2 ComputeMagetForce(b2Vec2 PosK, b2Vec2 PosI, b2Vec2 MomentK, b2Vec2 MomentI)
@@ -577,7 +578,7 @@ public:
     std::vector<stator> Stators;
     b2Body* m_rotor;
     float m_force;
-    float m_nu = 10000000.0f;
+    float m_nu = 1000000.0f;
 
     std::vector<float> positionsFlat;
     std::vector<float> momentFlat;
