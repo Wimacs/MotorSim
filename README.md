@@ -1,5 +1,5 @@
 # Motor Sim
-Few lines of code to add magnetic force simulation to a dynamics physics engine
+Few lines of code to add magnetic force simulation to a physics engine
 Enabling you to simulate magnets and some fun fixtures like BLDC motors.
 
 ![Alt text](image/magnetballs.gif)
